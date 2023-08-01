@@ -5,14 +5,12 @@ import copy
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.planning.planners import Heuristic
 from overcooked_ai_py.planning.search import SearchTree, find_path
-from overcooked_ai_py.planning.search import find_path
+from overcooked_ai_py.planning.search import find_path, get_intersect_counter,query_counter_states
 
 import numpy as np 
 import sys 
 import tiktoken
 from overcooked_ai_py.mdp.actions import Action, Direction
-
-
     
 class Agent(object):
 
@@ -38,7 +36,8 @@ class AgentGroup(object):
     def __init__(self, *agents, allow_duplicate_agents=False):
         self.agents = agents
         self.n = len(self.agents)
-        for i, agent in enumerate(self.agents):
+        
+        for i, agent in enumerate(self.agents):    
             agent.set_agent_index(i)
 
         if not all(a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)):
@@ -362,8 +361,7 @@ class GreedyHumanModel(Agent):
             chosen_goal = motion_goals[goal_idx]
             chosen_goal_action = possible_plans[goal_idx][0][0]
         else:
-            # MARKING: 原先代码：调用的是 get_lowest_cost_action_and_goal
-            # 改变后变成 new 了 
+            # get_lowest_cost_action_and_goal_new: dynamic search 
             if self.controller_mode == 'new':  
                 (
                     chosen_goal,
@@ -376,7 +374,7 @@ class GreedyHumanModel(Agent):
                     chosen_goal,
                     chosen_goal_action,
                 ) = self.get_lowest_cost_action_and_goal(
-                    start_pos_and_or, motion_goals, state
+                    start_pos_and_or, motion_goals
                 )
         return chosen_goal, chosen_goal_action
 
@@ -401,7 +399,33 @@ class GreedyHumanModel(Agent):
                 best_goal = goal
         return best_goal, best_action
     
+    
     def get_lowest_cost_action_and_goal_new(self, start_pos_and_or, motion_goals, state): 
+
+
+        min_cost = np.Inf
+        best_action, best_goal = None, None
+        for goal in motion_goals:   
+            action_plan, plan_cost = self.real_time_planner(
+                start_pos_and_or, goal, state
+            )     
+            if plan_cost < min_cost:
+                best_action = action_plan
+                min_cost = plan_cost
+                best_goal = goal   
+
+        # stuck or blocked, output warning.   
+        if best_action is None: 
+            print('\n\n\nBlocking Happend, executing default path\n\n\n')
+            print('current position = {}'.format(start_pos_and_or)) 
+            print('goal position = {}'.format(motion_goals))        
+            if np.random.rand() < 0.5:  
+                return None, Action.STAY
+            else: 
+                return self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
+        return best_goal, best_action
+    
+    def pre_lowest_cost_action_and_goal_new(self, start_pos_and_or, motion_goals, state): 
         """
             Chooses motion goal that has the lowest cost action plan.
             Returns the motion goal itself and the first action on the plan.
@@ -409,33 +433,14 @@ class GreedyHumanModel(Agent):
         min_cost = np.Inf
         best_action, best_goal = None, None
         for goal in motion_goals:   
-            """
-                print(start_pos_and_or, goal) 
-                ((4, 3), (0, -1)) ((3, 3), (0, 1))
-                sys.exit(0) 
-            """
-            # MARKING: 通过 self.mlam.motion_planner.get_plan 计算出这个 plan 的 cost 
             action_plan, plan_cost = self.real_time_planner(
                 start_pos_and_or, goal, state
             )     
-            """
-            print(action_plan)  = [(-1, 0), (0, 1), 'interact']
-            sys.exit(0) 
-            """
             if plan_cost < min_cost:
                 best_action = action_plan
                 min_cost = plan_cost
                 best_goal = goal   
-        #print(best_goal, best_action) 
-        #sys.exit(0) 
 
-        # 此时路被堵住了, 直接调用先前预处理好的 default 方案 
-        if best_action is None: 
-            print('\n\n\nBlocking Happend, executing default path\n\n\n')       
-            if np.random.rand() < 0.5: 
-                return motion_goals[0], Action.STAY
-            else: 
-                return self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
 
         return best_goal, best_action
 
@@ -473,6 +478,13 @@ class GreedyHumanModel(Agent):
         # NOTE: this most likely will fail in some tomato scenarios
         curr_order = state.curr_order
 
+        intersect_counters = get_intersect_counter(
+            state.players_pos_and_or[self.agent_index], 
+            state.players_pos_and_or[1 - self.agent_index], 
+            self.mdp, 
+            am
+        )
+        
         if not player.has_object():
 
             if curr_order == 'any':
@@ -485,15 +497,33 @@ class GreedyHumanModel(Agent):
             soup_nearly_ready = len(ready_soups) > 0 or len(cooking_soups) > 0
             other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
             
-            if soup_nearly_ready and not other_has_dish:
+            """
+                # 
+                counter_dicts = query_counter_states(self.mdp, state) 
+                Flag = False
+                Flag_onion = False 
+                if self.agent_index == 1: 
+                    cnt = 0 
+                    for _ in intersect_counters:  
+                        # query_counter_states
+                        if counter_dicts[_] == 'dish': 
+                            Flag = True     
+                        if counter_dicts[_] == 'onion': 
+                            cnt += 1 
+                    if cnt >= 2: 
+                        Flag_onion = True 
+                # print(counter_dicts, Flag) 
+            """
+            
+            motion_goals = [] 
+            if  soup_nearly_ready and not other_has_dish:   
                 motion_goals = am.pickup_dish_actions(state, counter_objects)
-            else:
+            else: 
                 next_order = None
                 if state.num_orders_remaining > 1:
                     next_order = state.next_order
-                
                 if next_order == 'onion':
-                    motion_goals = am.pickup_onion_actions(state, counter_objects)
+                    motion_goals = am.pickup_onion_actions(state, counter_objects) 
                 elif next_order == 'tomato':
                     motion_goals = am.pickup_tomato_actions(state, counter_objects)
                 elif next_order is None or next_order == 'any':
@@ -504,25 +534,41 @@ class GreedyHumanModel(Agent):
             
             if player_obj.name == 'onion':
                 motion_goals = am.put_onion_in_pot_actions(pot_states_dict)
-            
+
+                #print(motion_goals)
+                 
+                #cost, action = self.pre_lowest_cost_action_and_goal_new(
+                #    state.players_pos_and_or[self.agent_index], motion_goals, state 
+                #)
+                #if action is None:  
+                #    motion_goals = self.mdp.get_empty_counter_locations(state) 
+                #    motion_goals = am._get_ml_actions_for_positions(motion_goals)
+
             elif player_obj.name == 'tomato':
                 motion_goals = am.put_tomato_in_pot_actions(pot_states_dict)
 
             elif player_obj.name == 'dish':
                 motion_goals = am.pickup_soup_with_dish_actions(pot_states_dict, only_nearly_ready=True)
 
+                #cost, action = self.pre_lowest_cost_action_and_goal_new(
+                #    state.players_pos_and_or[self.agent_index], motion_goals, state 
+                #)
+                #if action is None:  
+                #    motion_goals = self.mdp.get_empty_counter_locations(state) 
+                #    motion_goals = am._get_ml_actions_for_positions(motion_goals)
+
             elif player_obj.name == 'soup':
                 motion_goals = am.deliver_soup_actions()
-
             else:
                 raise ValueError()
         
-        motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+
+        # print(motion_goals, player.pos_and_or) 
+        motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)] 
 
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)
             motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
             assert len(motion_goals) != 0
-
         return motion_goals
 
