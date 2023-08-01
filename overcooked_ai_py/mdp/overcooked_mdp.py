@@ -562,6 +562,15 @@ class OvercookedGridworld(object):
 
         return valid_joint_player_states
 
+    def get_valid_actions(self, player):  
+        pos = player.position 
+        lis = [Action.STAY] 
+        for d in Direction.ALL_DIRECTIONS:  
+            adj_pos = Action.move_in_direction(pos, d)  
+            if self.get_terrain_type_at_pos(adj_pos) == ' ':  
+                lis.append(d)  
+        return lis
+    
     def get_adjacent_features(self, player):
         adj_feats = []
         pos = player.position
