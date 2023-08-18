@@ -99,6 +99,12 @@ class OvercookedEnv(object):
             }
         return (next_state, sparse_reward, done, info)
 
+    def featurize_state_mdp(self, state, num_pots=2):
+        """
+        Wrapper of the mdp's featurize_state
+        """
+        return self.mdp.featurize_state(state, self.mlam, num_pots=num_pots)
+    
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
         self.mdp = self.mdp_generator_fn()

@@ -101,10 +101,12 @@ def find_path(start_pos_and_or, other_pos_and_or, goal, terrain_mtx):
     if last_node is None: 
         return None, np.Inf 
     else: 
-        print(f'planned last_node = {last_node.position}')
+        # print(f'planned last_node1 = {last_node.position}')
         previous_node = last_node        
         while (previous_node.parent is not None) and (previous_node.parent != start_node): 
             previous_node = previous_node.parent     
+        
+        # print(f'target = {goal},  start = {start_node.position}, next = {previous_node.position}')
         # already there. 
         if previous_node == start_node:  
             return Action.INTERACT, 1

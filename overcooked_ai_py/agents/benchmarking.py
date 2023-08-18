@@ -40,6 +40,45 @@ class AgentEvaluator(object):
         self.mlp_params = mlp_params
         self._mlp = None
 
+    @staticmethod
+    def from_mdp(
+        mdp,
+        env_params,
+        force_compute=False,
+        mlam_params=NO_COUNTERS_PARAMS,
+        debug=False,
+    ):
+        """
+        mdp (OvercookedGridworld): the mdp that we want the AgentEvaluator to always generate
+        Information for the rest of params please refer to the __init__ method above
+        """
+        assert (
+            type(mdp) == OvercookedGridworld
+        ), "mdp must be a OvercookedGridworld object"
+        mdp_fn = lambda _ignored: mdp
+        return AgentEvaluator(
+            env_params, mdp_fn, force_compute, mlam_params, debug
+        )
+
+
+    @staticmethod
+    def from_layout_name(
+        mdp_params,
+        env_params,
+        force_compute=False,
+        mlam_params=NO_COUNTERS_PARAMS,
+        debug=False,
+    ):
+        """
+        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        Information for the rest of params please refer to the __init__ method above
+        """
+        assert type(mdp_params) is dict and "layout_name" in mdp_params
+        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        return AgentEvaluator.from_mdp(
+            mdp, env_params, force_compute, mlam_params, debug
+        )
+    
     @property
     def mlp(self):
         assert not self.variable_mdp, "Variable mdp is not currently supported for planning"

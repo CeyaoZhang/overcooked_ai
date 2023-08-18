@@ -350,7 +350,7 @@ class OvercookedGridworld(object):
     """An MDP grid world based off of the Overcooked game."""
     ORDER_TYPES = ObjectState.SOUP_TYPES + ['any']
 
-    def __init__(self, terrain, start_player_positions, start_order_list=None, cook_time=20, num_items_for_soup=3, delivery_reward=20, rew_shaping_params=None, layout_name="unnamed_layout"):
+    def __init__(self, terrain, start_player_positions, start_order_list=None, cook_time=20, num_items_for_soup=3, delivery_reward=20, rew_shaping_params=None, layout_name="unnamed_layout", old_dynamics=False):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout

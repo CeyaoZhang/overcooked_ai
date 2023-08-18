@@ -5,11 +5,10 @@ import copy
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.planning.planners import Heuristic
 from overcooked_ai_py.planning.search import SearchTree, find_path
-from overcooked_ai_py.planning.search import find_path
+
 
 import numpy as np 
 import sys 
-import tiktoken
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
@@ -290,7 +289,7 @@ class GreedyHumanModel(Agent):
     in which an individual agent cannot complete the task on their own.
     """
 
-    def __init__(self, mlp, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1, controller_mode = 'new'):
+    def __init__(self, mlp, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1, controller_mode='new'):
         self.mlp = mlp
         self.mdp = self.mlp.mdp
 
@@ -331,6 +330,8 @@ class GreedyHumanModel(Agent):
         else:
             chosen_action = self.boltzmann_rational_ll_action(start_pos_and_or, chosen_goal)
         
+        print(f"P{self.agent_index} : {Action.to_char(chosen_action)}", end="") 
+
         # HACK: if two agents get stuck, select an action at random that would
         # change the player positions if the other player were not to move
         if self.prev_state is not None and state.players_pos_and_or == self.prev_state.players_pos_and_or:
@@ -349,6 +350,9 @@ class GreedyHumanModel(Agent):
 
             chosen_action = unblocking_joint_actions[np.random.choice(len(unblocking_joint_actions))][self.agent_index]
 
+            print(f'| after unstuck : {Action.to_char(chosen_action)}')  
+
+        print("\n")
         # NOTE: Assumes that calls to action are sequential
         self.prev_state = state
         return chosen_action
@@ -431,7 +435,7 @@ class GreedyHumanModel(Agent):
 
         # 此时路被堵住了, 直接调用先前预处理好的 default 方案 
         if best_action is None: 
-            print('\n\n\nBlocking Happend, executing default path\n\n\n')       
+            # print('\n\n\nBlocking Happend, executing default path\n\n\n')       
             if np.random.rand() < 0.5: 
                 return motion_goals[0], Action.STAY
             else: 
