@@ -8,6 +8,7 @@ from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, Ov
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
 
+from overcooked_ai_py.planning.search import get_visitable_positions 
 # Run planning logic with additional checks and
 # computation to prevent or identify possible minor errors
 SAFE_RUN = False
@@ -815,6 +816,32 @@ class MediumLevelActionManager(object):
         onion_dispenser_locations = self.mdp.get_onion_dispenser_locations()
         onion_pickup_locations = onion_dispenser_locations + counter_objects['onion']
         return self._get_ml_actions_for_positions(onion_pickup_locations)
+    
+    def pickup_onion_actions_new(self, state, counter_objects, player_positions, player_index):
+        onion_dispenser_locations = self.mdp.get_onion_dispenser_locations()
+        onion_pickup_locations = onion_dispenser_locations + counter_objects['onion']          
+        
+        visitable_cur = get_visitable_positions(player_positions[player_index], self.mdp)  
+        visitable_oth = get_visitable_positions(player_positions[1 - player_index], self.mdp) 
+
+        separate_states = [] 
+
+        for loc in onion_pickup_locations: 
+            possible_states = self._get_ml_actions_for_positions([loc]) 
+            flag_cur, flag_oth = False, False 
+            for i in possible_states:  
+                if i[0] in visitable_cur: 
+                    flag_cur = True 
+                if i[0] in visitable_oth: 
+                    flag_oth = True  
+            if flag_cur == True and flag_oth == False:  
+                separate_states.append(loc)   
+        
+        if len(separate_states) == 0:  
+            return self._get_ml_actions_for_positions(onion_pickup_locations)
+        else: 
+            return self._get_ml_actions_for_positions(separate_states)
+    
 
     def pickup_tomato_actions(self, state, counter_objects):
         tomato_dispenser_locations = self.mdp.get_tomato_dispenser_locations()
@@ -825,6 +852,31 @@ class MediumLevelActionManager(object):
         dish_dispenser_locations = self.mdp.get_dish_dispenser_locations()
         dish_pickup_locations = dish_dispenser_locations + counter_objects['dish']
         return self._get_ml_actions_for_positions(dish_pickup_locations)
+    
+    def pickup_dish_actions_new(self, state, counter_objects, player_positions, player_index):  
+        dish_dispenser_locations = self.mdp.get_dish_dispenser_locations()
+        dish_pickup_locations = dish_dispenser_locations + counter_objects['dish']          
+
+        visitable_cur = get_visitable_positions(player_positions[player_index], self.mdp)  
+        visitable_oth = get_visitable_positions(player_positions[1 - player_index], self.mdp) 
+
+        separate_states = [] 
+
+        for loc in dish_pickup_locations: 
+            possible_states = self._get_ml_actions_for_positions([loc]) 
+            flag_cur, flag_oth = False, False 
+            for i in possible_states:  
+                if i[0] in visitable_cur: 
+                    flag_cur = True 
+                if i[0] in visitable_oth: 
+                    flag_oth = True  
+            if flag_cur == True and flag_oth == False:  
+                separate_states.append(loc)   
+        
+        if len(separate_states) == 0:  
+            return self._get_ml_actions_for_positions(dish_pickup_locations)
+        else: 
+            return self._get_ml_actions_for_positions(separate_states)
 
     def pickup_counter_soup_actions(self, state, counter_objects):
         soup_pickup_locations = counter_objects['soup']

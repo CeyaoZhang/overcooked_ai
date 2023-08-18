@@ -1,7 +1,89 @@
+import sys 
 import heapq, time
 import numpy as np
 import scipy.sparse
 from overcooked_ai_py.mdp.actions import Action
+import copy 
+
+# return a list of visitable positions 
+def get_visitable_positions(player, mdp): 
+    yet_to_visit = [] 
+    visited = [] 
+    yet_to_visit.append(player[0])       
+    move = [(-1, 0),    # left 
+            (0, -1),    # up 
+            (1, 0),     # right 
+            (0, 1)]     # down 
+
+    mtx = mdp.terrain_mtx 
+    height = len(mtx)
+    width  = len(mtx[0]) 
+
+    while len(yet_to_visit) > 0:  
+        current_position = yet_to_visit[0] 
+        yet_to_visit.pop(0) 
+        visited.append(current_position)  
+
+        for delta in move: 
+            new_position = (current_position[0] + delta[0], current_position[1] + delta[1])
+            if (new_position[0] < 0 
+                or new_position[0] >= width
+                or new_position[1] < 0 
+                or new_position[1] >= height
+            ):
+                continue 
+            if mtx[new_position[1]][new_position[0]] != ' ': 
+                continue 
+
+            if (new_position in visited) or (new_position in yet_to_visit):  
+                continue  
+
+            yet_to_visit.append(new_position) 
+    
+    return visited 
+
+def query_counter_states(mdp, state): 
+    # mdp.get_counter_objects_dict(state)
+    obj_dict   = mdp.get_counter_objects_dict(state)    
+    empty_list = mdp.get_empty_counter_locations(state) 
+    counter_states = {}
+
+
+    for i in empty_list: 
+        counter_states[i] = ' '
+
+    for i in obj_dict: 
+        list_i = obj_dict[i] 
+        for counter in list_i:  
+            counter_states[counter] = i 
+
+    return counter_states 
+
+# return intersect counters that can be reached by both players 
+def get_intersect_counter(player, teammate, mdp, mlam):      
+    visible_player = get_visitable_positions(player, mdp) 
+    visible_teammate = get_visitable_positions(teammate, mdp) 
+
+    mtx = mdp.terrain_mtx 
+    height = len(mtx)
+    width  = len(mtx[0]) 
+
+    lis = [] 
+    all_counters = mdp.get_counter_locations() 
+    for counter in all_counters: 
+        motion_goals = mlam._get_ml_actions_for_positions([counter])        
+        if motion_goals == []: 
+            continue 
+        mark_player, mark_teammate = False, False
+        for o in motion_goals:  
+            if o[0] in visible_player: 
+                mark_player = True
+            if o[0] in visible_teammate: 
+                mark_teammate = True 
+        if mark_player == True and mark_teammate == True:  
+            lis.append(counter)  
+    return lis 
+
 
 class Node:
     """
@@ -42,17 +124,15 @@ def find_path(start_pos_and_or, other_pos_and_or, goal, terrain_mtx):
 
     mtx[other_pos_and_or[0][1]][other_pos_and_or[0][0]] = 'B' 
 
-    
-
     yet_to_visit_list.append(start_node)   
 
-    # let's just do bfs for now. 
+    # BFS search 
     while len(yet_to_visit_list) > 0:  
         current_node = yet_to_visit_list[0]    
         yet_to_visit_list.pop(0)  
         visited_list.append(current_node)   
 
-        # 已经从一个方向到达，无需继续扩展了 
+        # reached, no need to search further
         if current_node.position[0] == goal[0]: 
             continue 
         
@@ -80,7 +160,7 @@ def find_path(start_pos_and_or, other_pos_and_or, goal, terrain_mtx):
 
             new_node.f = current_node.f + 1 
             yet_to_visit_list.append(new_node)  
-    # visited     
+
     last_node = None 
     for i in visited_list:  
         if i.position[0] == goal[0]:   
@@ -97,6 +177,7 @@ def find_path(start_pos_and_or, other_pos_and_or, goal, terrain_mtx):
                     last_node = Node(i, (goal[0], goal[1])) 
                     last_node.f = i.f + 1 
 
+    
     # no available plans. 
     if last_node is None: 
         return None, np.Inf 
@@ -107,7 +188,8 @@ def find_path(start_pos_and_or, other_pos_and_or, goal, terrain_mtx):
             previous_node = previous_node.parent     
         
         # print(f'target = {goal},  start = {start_node.position}, next = {previous_node.position}')
-        # already there. 
+        # already there.    
+
         if previous_node == start_node:  
             return Action.INTERACT, 1
         else: 
